@@ -20,7 +20,8 @@ class CodeHandler(tornado.web.RequestHandler):
     def get(self):
         thisfile = open(__file__, 'r')
         code = highlight(thisfile.read(), PythonLexer(), HtmlFormatter())
-        html = '<html><head><style>%s</style></head><body>%s</body></html>' % (HtmlFormatter().get_style_defs('.highlight'), code)
+        #html = '<html><head><style>%s</style></head><body>%s</body></html>' % (HtmlFormatter().get_style_defs('.highlight'), code)
+        html = '<style>%s</style>%s' % (HtmlFormatter().get_style_defs('.highlight'), code)
         self.write(html)
         thisfile.close()
 
