@@ -3,34 +3,35 @@ function print_date() {
     var datestring = (date.getHours() < 10 ? "0"+date.getHours():date.getHours());
     datestring += ":";
     datestring += (date.getMinutes() < 10 ? "0"+date.getMinutes():date.getMinutes());
-    $("#chat").append($("<p>").addClass("timestamp").html(datestring));
+    $("#chat-log").append($("<p>").addClass("timestamp").html(datestring));
 }
 function print_namechange(oldname, newname) {
-    print_date();
-    $("#chat").append($("<p>").addClass("notification").html(oldname + " is now known as " + newname));
-    $("#chat").attr({ scrollTop: $("#chat").attr("scrollHeight") });
+    $("#chat-log").append($("<p>").addClass("notification").text(oldname + " is now known as " + newname));
 }
 
 function print_message(sender, message) {
-    print_date();
-    $("#chat").append($("<p>").addClass("sender").html('&lt;'+sender+'&gt; '));
-    $("#chat").append($("<p>").addClass("message").html(message));
-    $("#chat").attr({ scrollTop: $("#chat").attr("scrollHeight") });
+    $("#chat-log").append($("<p>").addClass("sender").text('<'+sender+'>'));
+    $("#chat-log").append($("<p>").addClass("message").text(message));
 }
 
 function print_join(joiner) {
-    print_date();
-    $("#chat").append($("<p>").addClass("notification").html(joiner + " joined"));
+    $("#chat-log").append($("<p>").addClass("notification").text(joiner + " joined"));
 }
 
 function print_leave(leaver) {
+    $("#chat-log").append($("<p>").addClass("notification").text(leaver + " left"));
 }
 
-function update_userlist(users) {
-    $("#userlist").empty();
+function print_userlist(users) {
+    var userlist = "";
+    //$("#userlist").empty();
     for(var i=0;i<users.length;++i) {
-        $("#userlist").append($("<li>").html(users[i]));
+        userlist += users[i] + ", ";
+        //$("#userlist").append($("<li>").html(users[i]));
     }
+    userlist = userlist.substr(0, userlist.length-2)
+    $("#chat-log").append($("<p>").addClass("notification").text("Connected users: " + userlist));
+
 }
 
 // Different message types(Use dict with functions instead, and let them parse the jsondata?)
@@ -39,6 +40,26 @@ var NAMECHANGE  = 1;
 var JOIN        = 2;
 var LEAVE       = 3;
 var USERLIST    = 4;
+
+function print_response(jsondata) {
+    print_date();
+    if(jsondata["TYPE"] == MESSAGE) {
+        print_message(jsondata["SENDER"], jsondata["MESSAGE"]);
+    } 
+    else if(jsondata["TYPE"] == JOIN) {
+        print_join(jsondata["USER"]);
+    }
+    else if(jsondata["TYPE"] == NAMECHANGE) {
+        print_namechange(jsondata["OLDNAME"], jsondata["NEWNAME"]);
+    }
+    else if(jsondata["TYPE"] == LEAVE) {
+        print_leave(jsondata['USER']);
+    }
+    else if(jsondata["TYPE"] == USERLIST) {
+        print_userlist(jsondata['USERS']);
+    }
+    $("#chat-log").scrollTop($("#chat-log")[0].scrollHeight);
+}
 
 $(function() {
     $("form[name=connect]").submit(function(evt) {
@@ -49,23 +70,11 @@ $(function() {
         ws.onmessage = function(event) { 
             // TODO: Error handling
             var jsondata = jQuery.parseJSON(event.data);
-            if(jsondata["TYPE"] == MESSAGE) {
-                print_message(jsondata["SENDER"], jsondata["MESSAGE"]);
-            } 
-            else if(jsondata["TYPE"] == JOIN) {
-                print_join(jsondata["USER"]);
-            }
-            else if(jsondata["TYPE"] == NAMECHANGE) {
-                print_namechange(jsondata["OLDNAME"], jsondata["NEWNAME"]);
-            }
-            else if(jsondata["TYPE"] == USERLIST) {
-                update_userlist(jsondata['USERS']);
-            }
-
+            print_response(jsondata)
         }
         ws.onclose = function() { }//append_chat("Connection closed"); }
-        $("#login-form").hide();
-        $("#chat-holder").show();
+        $("#connect-form").hide();
+        $("#chat").show();
 
         $('form[name=chat]').submit(function(e) {
             ws.send($('#say').val());

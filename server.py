@@ -10,14 +10,13 @@ from pygments import highlight
 from pygments.lexers import PythonLexer
 from pygments.formatters import HtmlFormatter
 
-CONNECTED_CLIENTS = []
-
 class MainHandler(tornado.web.RequestHandler):
+    """ Renders the index file """
     def get(self):
         return self.write(open("index.html", 'r').read())
 
 class CodeHandler(tornado.web.RequestHandler):
-    """ Handler which prints the current files source code syntax highlighted in HTML """
+    """ Prints the source code for the current file highlighted in HTML """
     def get(self):
         thisfile = open(__file__, 'r')
         code = highlight(thisfile.read(), PythonLexer(), HtmlFormatter())
@@ -25,14 +24,18 @@ class CodeHandler(tornado.web.RequestHandler):
         self.write(html)
         thisfile.close()
 
-
 # Different message types
 MESSAGE     = 0
 NAMECHANGE  = 1
 JOIN        = 2
 LEAVE       = 3
 USERLIST    = 4
+
+# The list of currently connected clients
+CONNECTED_CLIENTS = []
+
 class ChatWebSocket(tornado.websocket.WebSocketHandler):
+    """ The chat implemententation, all data send to server is plain text, all responses are json """
 
     def open(self):
         CONNECTED_CLIENTS.append(self)
@@ -53,9 +56,9 @@ class ChatWebSocket(tornado.websocket.WebSocketHandler):
         else:
             self.broadcast(self.create_message_pkg(message))
 
-    def broadcast(self, pkg):
+    def broadcast(self, pkg, all_but=None):
         for c in CONNECTED_CLIENTS:
-            if c.join_completed:
+            if c.join_completed and c != all_but:
                 c.write_message(pkg)
 
     def create_join_pkg(self):
@@ -70,6 +73,10 @@ class ChatWebSocket(tornado.websocket.WebSocketHandler):
         pkgdata = {'TYPE': MESSAGE, 'SENDER': self.client_name, 'MESSAGE': msg}
         return json.dumps(pkgdata)
 
+    def create_leave_pkg(self):
+        pkgdata = {'TYPE': LEAVE, 'USER': self.client_name}
+        return json.dumps(pkgdata)
+
     def create_userlist_pkg(self):
         pkgdata = {'TYPE': USERLIST, 'USERS': [c.client_name for c in CONNECTED_CLIENTS]}
         return json.dumps(pkgdata)
@@ -80,12 +87,10 @@ class ChatWebSocket(tornado.websocket.WebSocketHandler):
                 old_name = self.client_name
                 self.client_name = arg
                 self.broadcast(self.create_name_change_pkg(old_name))
-                self.broadcast(self.create_userlist_pkg())
             else:
                 self.client_name = arg
                 self.join_completed = True
                 self.broadcast(self.create_join_pkg())
-                self.broadcast(self.create_userlist_pkg())
         elif cmd == '/names':
             self.write_message(self.create_userlist_pkg())
         else:
@@ -93,6 +98,7 @@ class ChatWebSocket(tornado.websocket.WebSocketHandler):
             # Error
 
     def on_close(self):
+        self.broadcast(self.create_leave_pkg(), all_but=self)
         CONNECTED_CLIENTS.remove(self)
 
 app = tornado.web.Application([

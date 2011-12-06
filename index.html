@@ -7,20 +7,17 @@
     </head>
     <style>
     body { font-family: Helvetica; }
+    html, body {
+        height: 100%
+    }
     .strong { color:#a00; font-weight: bold; }
-    #chat {
-        float: left;
+    #chat-log {
         overflow:auto;
         height: 200px;
         font-size: 10pt;
-        width: 75%;
+        width: 800px;
     }
-    #users { 
-        width: 25%;
-        float: left;
-        height: 200px;
-    }
-    #chat p {
+    #chat-log p {
         margin: 0px;
     }
     p.timestamp {
@@ -28,7 +25,6 @@
         float: left;
         width: 70px;
     }
-
     p.sender {
         float: left;
         font-weight: bold;
@@ -41,26 +37,29 @@
         float: left;
         font-style: italic;
     }
+    #chat-box {
+        width: 800px;
+    }
     </style>
     <script type="text/javascript">
     </script>
     <body>
         <h1><span class="strong">WebSocket</span> Chat</h1>
-        <div id="login-form">
+        <a href="/code" id="codelink" target="_blank">Code</a>
+
+        <!-- Connect form -->
+        <div id="connect-form">
             <form method="post" name="connect" actions="/notused">
                 <label for="name">Nickname:</label>
                 <input type="text" name="name" id="nickname" />
                 <button id="connect-button">Connect</button>
             </form>
-
         </div>
-        <div id="chat-holder" style="display: none;">
-            <div id="chat"></div>
-            <div id="users">
-                <ul id="userlist">
-                </ul>
-            </div>
-            <form method="post" name="chat" actions="/notused">
+
+        <!-- Chat -->
+        <div id="chat" style="display: none;">
+            <div id="chat-log"></div>
+            <form method="post" name="chat" id="chat-box" actions="/notused">
                 <input type="text" name="say" style='width:100%' id="say" />
             </form>
         </div>
