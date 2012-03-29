@@ -88,10 +88,11 @@ class ChatWebSocket(tornado.websocket.WebSocketHandler):
                 old_name = self.client_name
                 self.client_name = arg
                 self.broadcast(self.create_name_change_pkg(old_name))
-            else:
+            else: # Join
                 self.client_name = arg
                 self.join_completed = True
                 self.broadcast(self.create_join_pkg())
+                self.write_message(self.create_userlist_pkg())
         elif cmd == '/names':
             self.write_message(self.create_userlist_pkg())
         else:
@@ -106,7 +107,8 @@ app = tornado.web.Application([
     (r"/", MainHandler),
     (r"/code", CodeHandler),
     (r"/chat", ChatWebSocket),
-    (r"/js/(.*)", tornado.web.StaticFileHandler, {"path": os.path.join(os.path.dirname(__file__), 'js')})
+    (r"/js/(.*)", tornado.web.StaticFileHandler, {"path": os.path.join(os.path.dirname(__file__), 'js')}),
+    (r"/css/(.*)", tornado.web.StaticFileHandler, {"path": os.path.join(os.path.dirname(__file__), 'css')})
 ])
 
 if __name__ == '__main__':

@@ -25,6 +25,17 @@ function create_userlist_element(users) {
     return $("<div>").addClass("span15").addClass("notification").text("Connected users: " + users.join(", "));
 }
 
+function update_user_list(users) {
+    console.log("users" + users);
+    $("#userlist").empty();
+    var userlist = $("<ul>").addClass("nav").addClass("nav-list");
+    userlist.append($("<li>").addClass("nav-header").text("Users"));
+    for(var idx in users) {
+        userlist.append($("<li>").text(users[idx]));
+    };
+    $("#userlist").append(userlist);
+}
+
 // Different message types
 var MESSAGE     = 0;
 var NAMECHANGE  = 1;
@@ -34,6 +45,7 @@ var USERLIST    = 4;
 
 // TODO: Use dict with functions instead, and let them parse the jsondata?
 function print_response(jsondata) {
+    console.log(jsondata);
     var date_element = create_date_element();
     var element;
     if(jsondata["TYPE"] == MESSAGE) {
@@ -50,10 +62,11 @@ function print_response(jsondata) {
     }
     else if(jsondata["TYPE"] == USERLIST) {
         element = create_userlist_element(jsondata['USERS']);
+        update_user_list(jsondata['USERS']);
     }
     $("#chat-log").append($("<div>").addClass("row").append(date_element).append(element));
-    //$("#chat-log").scrollTop($("#chat-log")[0].scrollHeight);
-    document.body.scrollTop = document.body.scrollHeight;
+    $("#chat-log").scrollTop($("#chat-log")[0].scrollHeight);
+    //document.body.scrollTop = document.body.scrollHeight;
 }
 
 $(function() {
@@ -61,7 +74,7 @@ $(function() {
     $("form[name=connect]").submit(function(evt) {
         var nick = $("#nickname").val();
 
-        var ws = new WebSocket("ws://192.168.1.65:8080/chat");
+        var ws = new WebSocket("ws://localhost:8080/chat");
         ws.onopen = function() { ws.send("/name " + nick); }
         ws.onmessage = function(event) { 
             // TODO: Error handling
