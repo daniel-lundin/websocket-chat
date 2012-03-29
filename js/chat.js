@@ -25,8 +25,11 @@ function create_userlist_element(users) {
     return $("<div>").addClass("span15").addClass("notification").text("Connected users: " + users.join(", "));
 }
 
+function create_error_element(detail) {
+    return $("<div>").addClass("span15").addClass("error").text(detail);
+}
+
 function update_user_list(users) {
-    console.log("users" + users);
     $("#userlist").empty();
     var userlist = $("<ul>").addClass("nav").addClass("nav-list");
     userlist.append($("<li>").addClass("nav-header").text("Users"));
@@ -42,10 +45,10 @@ var NAMECHANGE  = 1;
 var JOIN        = 2;
 var LEAVE       = 3;
 var USERLIST    = 4;
+var ERROR       = 5;
 
 // TODO: Use dict with functions instead, and let them parse the jsondata?
 function print_response(jsondata) {
-    console.log(jsondata);
     var date_element = create_date_element();
     var element;
     if(jsondata["TYPE"] == MESSAGE) {
@@ -64,9 +67,50 @@ function print_response(jsondata) {
         element = create_userlist_element(jsondata['USERS']);
         update_user_list(jsondata['USERS']);
     }
+    else if(jsondata["TYPE"] == USERLIST) {
+        element = create_userlist_element(jsondata['USERS']);
+        update_user_list(jsondata['USERS']);
+    }
+    else if(jsondata["TYPE"] == ERROR) {
+        element = create_error_element(jsondata['DETAIL']);
+    }
     $("#chat-log").append($("<div>").addClass("row").append(date_element).append(element));
     $("#chat-log").scrollTop($("#chat-log")[0].scrollHeight);
-    //document.body.scrollTop = document.body.scrollHeight;
+}
+
+function parse_user_message(message) {
+    if(message.search("/nick") == 0) {
+        var split = message.split(" ");
+        if(split.length != 2) {
+            // TODO: Show error
+            return;
+        }
+        return ws.send(create_name_change_pkg(split[1]));
+    }
+    if(message.search("/names") == 0) {
+        return ws.send(create_userlist_pkg());
+    }
+    return ws.send(create_msg_pkg(message));
+}
+
+function create_msg_pkg(message) {
+    var msg = {"TYPE": MESSAGE, "MESSAGE": message};
+    return JSON.stringify(msg);
+}
+
+function create_userlist_pkg() {
+    var msg = {"TYPE": USERLIST};
+    return JSON.stringify(msg);
+}
+
+function create_name_change_pkg(newname) {
+    var msg = {"TYPE": NAMECHANGE, "NEWNAME": newname};
+    return JSON.stringify(msg);
+}
+
+function create_join_pkg(name) {
+    var msg = {"TYPE": JOIN, "USER": name};
+    return JSON.stringify(msg);
 }
 
 $(function() {
@@ -74,8 +118,9 @@ $(function() {
     $("form[name=connect]").submit(function(evt) {
         var nick = $("#nickname").val();
 
-        var ws = new WebSocket("ws://localhost:8080/chat");
-        ws.onopen = function() { ws.send("/name " + nick); }
+        // global
+        ws = new WebSocket("ws://localhost:8080/chat");
+        ws.onopen = function() { ws.send(create_join_pkg(nick)); }
         ws.onmessage = function(event) { 
             // TODO: Error handling
             var jsondata = jQuery.parseJSON(event.data);
@@ -87,9 +132,9 @@ $(function() {
         $("#say").focus();
 
         $('form[name=chat]').submit(function(e) {
-            ws.send($('#say').val());
+            parse_user_message($('#say').val());
             $('#say').val('');
-            return false; // Or e.preventDefault() ?
+            return false;
         });
         evt.preventDefault();
     });

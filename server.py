@@ -20,7 +20,6 @@ class CodeHandler(tornado.web.RequestHandler):
     def get(self):
         thisfile = open(__file__, 'r')
         code = highlight(thisfile.read(), PythonLexer(), HtmlFormatter())
-        #html = '<html><head><style>%s</style></head><body>%s</body></html>' % (HtmlFormatter().get_style_defs('.highlight'), code)
         html = '<style>%s</style>%s' % (HtmlFormatter().get_style_defs('.highlight'), code)
         self.write(html)
         thisfile.close()
@@ -31,31 +30,40 @@ NAMECHANGE  = 1
 JOIN        = 2
 LEAVE       = 3
 USERLIST    = 4
+ERROR       = 5
 
 # The list of currently connected clients
 CONNECTED_CLIENTS = []
 
 class ChatWebSocket(tornado.websocket.WebSocketHandler):
-    """ The chat implemententation, all data send to server is plain text, all responses are json """
+    """ The chat implemententation, all data send to server is json, all responses are json """
 
     def open(self):
         CONNECTED_CLIENTS.append(self)
-        self.client_name=''
+        self.client_name = ''
         self.join_completed = False # Not completed until a name has been selected
 
     def on_message(self, message):
-        if message.startswith("/"):
-            # A command
-            spl = message.split(" ")
-            if len(spl) == 1:
-                cmd,arg = spl[0], ""
-            elif len(spl) == 2:
-                cmd, arg = spl
-            else:
-                return self.write_message('Invalid command')
-            self.execute_command(cmd, arg)
+        try:
+            pkg = json.loads(message)
+        except:
+            return self.write_message(self.create_error_pkg(u'Format error'))
+        if pkg['TYPE'] == JOIN:
+            self.join_completed = True
+            self.client_name = pkg['USER']
+            self.join_completed = True
+            self.broadcast(self.create_join_pkg())
+            self.write_message(self.create_userlist_pkg())
+        elif pkg['TYPE'] == MESSAGE:
+            self.broadcast(self.create_message_pkg(pkg['MESSAGE']))
+        elif pkg['TYPE'] == USERLIST:
+            self.write_message(self.create_userlist_pkg())
+        elif pkg['TYPE'] == NAMECHANGE:
+            old_name = self.client_name
+            self.client_name = pkg['NEWNAME']
+            self.broadcast(self.create_name_change_pkg(old_name))
         else:
-            self.broadcast(self.create_message_pkg(message))
+            self.write_message(self.create_error_pkg('unknown message type'))
 
     def broadcast(self, pkg, all_but=None):
         for c in CONNECTED_CLIENTS:
@@ -82,22 +90,9 @@ class ChatWebSocket(tornado.websocket.WebSocketHandler):
         pkgdata = {'TYPE': USERLIST, 'USERS': [c.client_name for c in CONNECTED_CLIENTS]}
         return json.dumps(pkgdata)
 
-    def execute_command(self, cmd, arg):
-        if cmd == '/name':
-            if self.join_completed:
-                old_name = self.client_name
-                self.client_name = arg
-                self.broadcast(self.create_name_change_pkg(old_name))
-            else: # Join
-                self.client_name = arg
-                self.join_completed = True
-                self.broadcast(self.create_join_pkg())
-                self.write_message(self.create_userlist_pkg())
-        elif cmd == '/names':
-            self.write_message(self.create_userlist_pkg())
-        else:
-            pass
-            # Error
+    def create_error_pkg(self, detail):
+        pkgdata = {'TYPE': ERROR, 'DETAIL': detail}
+        return json.dumps(pkgdata)
 
     def on_close(self):
         self.broadcast(self.create_leave_pkg(), all_but=self)
